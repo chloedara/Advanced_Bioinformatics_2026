@@ -1,0 +1,190 @@
+---
+title: "Advanced Bioinformatics 2026 assessment"
+author: "m2203099"
+date: "2026-04-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(shiny)
+```
+
+**Task 1. Sum of all integers between 5 and 55**
+
+```{r}
+sum(5:55)
+```
+**Task 2. Sum of all integers between 5 and n**
+
+```{r}
+sumfun <- function(n)
+  return(sum(5:n))
+
+sumfun(10)
+sumfun(20)
+sumfun(100)
+```
+**Task 3. The Fibonnaci series**
+
+```{r}
+# Make a vector to hold 12 numbers
+fib <- numeric(12)
+
+# Define the first two values of the sequence
+fib[1] <- 1
+fib[2] <- 1
+
+# Use a for loop to calculate the rest (starting from index 3)
+for (i in 3:12) {
+  fib[i] <- fib[i-1] + fib[i-2]
+}
+
+print(fib)
+```
+**Task 4. mtcars ggplot**
+
+```{r}
+ggplot(data=mtcars, aes(x=as.factor(gear), y=mpg, fill = as.factor(gear))) +
+  geom_boxplot() +
+  labs(x="Number of Gears", y="Miles Per Gallon", fill="Gears")
+```
+
+**Task 5. A linear relationship between speed and breaking distance**
+
+```{r}
+Model <- lm(dist ~ speed, data=cars)
+
+summary(Model)
+?cars
+```
+**Task 6. ggplot of Task 5 data**
+
+```{r}
+ggplot(cars, aes(x=speed, y=dist)) +
+  geom_point() +
+  geom_smooth(method="lm")
+```
+
+**Task 7. lm and ggplot - more complex**
+```{r}
+# 1. Convert units to be useful (mph to feet per second)
+cars$speed_fps <- cars$speed * 1.467
+
+# 2. Create the transformed Y variable
+cars$y_ratio <- cars$dist / cars$speed_fps
+
+# 3. Fit the linear model
+Model2 <- lm(y_ratio ~ speed_fps, data=cars)
+
+# 4. View the results
+summary(Model2)
+```
+```{r}
+# 5. Plot it to show the straight line
+ggplot(cars, aes(x=speed_fps, y=y_ratio)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(y = "Distance / Speed (Reaction Time + k*speed)",
+       x = "Speed (ft/s)")
+```
+
+**Task 8. Load the data onto Rstudio**
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+counts <- read.csv("exercise1_counts.csv", header = T, row.names = 1)
+
+sample_info <- read.table("exercise1_sample_description.info", sep = "\t", header = TRUE)
+```
+
+**Task 9. Create col_data and check dimensions**
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+# Create col data from sample description
+col_data <- data.frame(filename = sample_info$filename, sample = sample_info$sample, condition = sample_info$condition, batch = sample_info$batch)
+head(col_data)
+
+# Clean the filename
+col_data$filename <- gsub("TMC_", "", col_data$filename)
+
+# Check the dimensions
+all(sort(colnames(counts)) == sort(col_data$filename))
+```
+
+**Task 10. Construct DESeqDataSet object using count data and sample description. **
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+# Load DESeq2 library
+suppressPackageStartupMessages(library(DESeq2))
+
+# Create DESeq object
+dds <- DESeqDataSetFromMatrix(countData = counts, colData = col_data, design =~ condition)
+dds
+
+# Normalize using DESeq
+dds <- DESeq(dds)
+```
+
+**Task 11. Perform rlog and VST transformation on the data. **
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+# Normalize using rlog2
+rlog2 <- rlog(dds)
+rlog2_counts <- assay(rlog2)
+# Normalize using vst
+vst <- varianceStabilizingTransformation(dds)
+vst_counts <- assay(vst)
+```
+
+**Task 12. Draw a heatmap of count matrix based on the top 40 highly expressed genes using rlog and VST data. **
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+# Install heatmap package
+# install.packages("pheatmap")
+library(pheatmap)
+# Select top 40 highly expressed genes
+select <- order(rowMeans(counts(dds, normalized = TRUE)), decreasing = TRUE)[1:40]
+# Heatmap using rlog data
+pheatmap(assay(rlog2)[select, ])
+# Heatmap using VST data
+pheatmap(assay(vst)[select, ])
+```
+
+**Task 13. Generate a SDM to see the clustering of count data. **
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+# Compute sample distance matrix
+sdm <- as.matrix(dist(t(rlog2_counts)))
+```
+
+**Task 14. Perform the Principal Component Analysis using rlog method and find out the % significance values of first two principal components. **
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+rlog2_counts <- rlog2_counts[rowSums(rlog2_counts) > 10, ]
+pca <- prcomp(t(rlog2_counts), scale = TRUE)
+summary(pca)
+```
+
+**Task 15. Repeat the PCA, this time using VST method and compare the plots with the ones obtained using rlog method. **
+```{r,collapse=T,warning=FALSE,eval=TRUE}
+pca <- prcomp(t(vst_counts), scale = TRUE)
+summary(pca)
+```
